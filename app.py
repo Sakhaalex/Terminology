@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import io
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta, date
 from typing import Any
 
@@ -47,6 +47,8 @@ class Transaction:
     transaction_id: str = ""
     utr: str = ""
     source: str = ""
+    counterparty: str = ""
+    account_type: str = "normal"
     created_at: str = ""
     edited_at: str = ""
 
@@ -63,19 +65,38 @@ NOISE_PATTERNS = [
     re.compile(r"transaction\s+history", re.IGNORECASE),
 ]
 
-DATE_PATTERN = re.compile(r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})")
+NUMERIC_DATE_PATTERN = re.compile(r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})")
+TEXT_DATE_PATTERN = re.compile(r"([A-Za-z]{3,9}\s+\d{1,2},\s+\d{4})")
 AMOUNT_PATTERN = re.compile(r"₹\s*([0-9,]+(?:\.\d+)?)")
 TXN_ID_PATTERN = re.compile(r"(?:txn|transaction)\s*id[:\s]*([A-Za-z0-9-]+)", re.IGNORECASE)
 UTR_PATTERN = re.compile(r"utr[:\s]*([A-Za-z0-9]+)", re.IGNORECASE)
 
 
 def normalize_date(value: str) -> str:
-    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y", "%d-%m-%y"):
+    value = value.strip()
+    for fmt in (
+        "%d/%m/%Y",
+        "%d-%m-%Y",
+        "%d/%m/%y",
+        "%d-%m-%y",
+        "%b %d, %Y",
+        "%B %d, %Y",
+    ):
         try:
             return datetime.strptime(value, fmt).date().isoformat()
         except ValueError:
             continue
     return date.today().isoformat()
+
+
+def extract_date(text: str) -> str | None:
+    numeric_match = NUMERIC_DATE_PATTERN.search(text)
+    if numeric_match:
+        return numeric_match.group(1)
+    text_match = TEXT_DATE_PATTERN.search(text)
+    if text_match:
+        return text_match.group(1)
+    return None
 
 
 def parse_upi_text(text: str) -> list[dict[str, Any]]:
@@ -89,7 +110,7 @@ def parse_upi_text(text: str) -> list[dict[str, Any]]:
     blocks: list[list[str]] = []
     current: list[str] = []
     for line in filtered:
-        if DATE_PATTERN.search(line) and current:
+        if extract_date(line) and current:
             blocks.append(current)
             current = [line]
         else:
@@ -100,9 +121,9 @@ def parse_upi_text(text: str) -> list[dict[str, Any]]:
     transactions: list[dict[str, Any]] = []
     for block in blocks:
         block_text = " ".join(block)
-        date_match = DATE_PATTERN.search(block_text)
+        date_value = extract_date(block_text)
         amount_match = AMOUNT_PATTERN.search(block_text)
-        if not date_match or not amount_match:
+        if not date_value or not amount_match:
             continue
         subject = ""
         tx_type = ""
@@ -129,13 +150,13 @@ def parse_upi_text(text: str) -> list[dict[str, Any]]:
             utr = utr_match.group(1)
 
         note = block_text
-        for token in [date_match.group(1), amount_match.group(0)]:
+        for token in [date_value, amount_match.group(0)]:
             note = note.replace(token, "")
         note = re.sub(r"\s+", " ", note).strip()
 
         transactions.append(
             {
-                "date": normalize_date(date_match.group(1)),
+                "date": normalize_date(date_value),
                 "subject": subject or "Unknown",
                 "category": "General",
                 "amount": amount,
@@ -144,6 +165,8 @@ def parse_upi_text(text: str) -> list[dict[str, Any]]:
                 "transaction_id": txn_id,
                 "utr": utr,
                 "source": "UPI_IMPORT",
+                "counterparty": "",
+                "account_type": "normal",
             }
         )
     return transactions
@@ -167,6 +190,8 @@ def add_transaction(payload: dict[str, Any]) -> None:
         transaction_id=payload.get("transaction_id", ""),
         utr=payload.get("utr", ""),
         source=payload.get("source", ""),
+        counterparty=payload.get("counterparty", ""),
+        account_type=payload.get("account_type", "normal"),
         created_at=now,
     )
     NEXT_ID += 1
@@ -200,8 +225,13 @@ def analytics_images(transactions: list[Transaction]) -> dict[str, str]:
         return {}
     totals_data = totals(transactions)
     fig1, ax1 = plt.subplots()
-    ax1.bar(["Spend", "Income"], [totals_data["spend"], totals_data["income"]])
+    ax1.bar(
+        ["Spend", "Income"],
+        [totals_data["spend"], totals_data["income"]],
+        color=["#d9534f", "#5cb85c"],
+    )
     ax1.set_title("Total Spend vs Total Income")
+    ax1.set_ylabel("Amount (INR)")
     images = {"totals": chart_image(fig1)}
 
     category_totals: dict[str, float] = {}
@@ -223,15 +253,21 @@ def analytics_images(transactions: list[Transaction]) -> dict[str, str]:
     if subject_totals:
         top_subjects = sorted(subject_totals.items(), key=lambda x: x[1], reverse=True)[:10]
         fig3, ax3 = plt.subplots()
-        ax3.barh([s for s, _ in top_subjects][::-1], [v for _, v in top_subjects][::-1])
+        ax3.barh(
+            [s for s, _ in top_subjects][::-1],
+            [v for _, v in top_subjects][::-1],
+            color="#d9534f",
+        )
         ax3.set_title("Top Subjects by Spend")
+        ax3.set_xlabel("Amount (INR)")
         images["top_subjects"] = chart_image(fig3)
 
     if subject_frequency:
         freq_sorted = sorted(subject_frequency.items(), key=lambda x: x[1], reverse=True)[:10]
         fig4, ax4 = plt.subplots()
-        ax4.bar([s for s, _ in freq_sorted], [v for _, v in freq_sorted])
+        ax4.bar([s for s, _ in freq_sorted], [v for _, v in freq_sorted], color="#5bc0de")
         ax4.set_title("Transaction Frequency by Subject")
+        ax4.set_ylabel("Count")
         ax4.tick_params(axis="x", rotation=45)
         images["frequency"] = chart_image(fig4)
 
@@ -242,8 +278,14 @@ def analytics_images(transactions: list[Transaction]) -> dict[str, str]:
     if daily_totals:
         dates_sorted = sorted(daily_totals.items())
         fig5, ax5 = plt.subplots()
-        ax5.plot([d for d, _ in dates_sorted], [v for _, v in dates_sorted], marker="o")
+        ax5.plot(
+            [d for d, _ in dates_sorted],
+            [v for _, v in dates_sorted],
+            marker="o",
+            color="#d9534f",
+        )
         ax5.set_title("Daily Spend Trend")
+        ax5.set_ylabel("Amount (INR)")
         ax5.tick_params(axis="x", rotation=45)
         images["trend"] = chart_image(fig5)
 
@@ -252,11 +294,26 @@ def analytics_images(transactions: list[Transaction]) -> dict[str, str]:
         days = len(daily_totals)
         burn_rate = total_spend / days if days else 0
         fig6, ax6 = plt.subplots()
-        ax6.bar(["Burn Rate (Avg/Day)"], [burn_rate])
+        ax6.bar(["Burn Rate (Avg/Day)"], [burn_rate], color="#d9534f")
         ax6.set_title("Burn Rate")
+        ax6.set_ylabel("Amount (INR)")
         images["burn_rate"] = chart_image(fig6)
 
     return images
+
+
+def loan_balances(transactions: list[Transaction]) -> dict[str, float]:
+    balances: dict[str, float] = {}
+    for transaction in transactions:
+        if transaction.account_type != "loan":
+            continue
+        key = transaction.counterparty or "Unspecified"
+        balances.setdefault(key, 0.0)
+        if transaction.type == "Credit":
+            balances[key] += transaction.amount
+        else:
+            balances[key] -= transaction.amount
+    return balances
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -296,6 +353,8 @@ def dashboard():
             "amount": form.get("amount", "0"),
             "type": form.get("type", "Debit"),
             "note": form.get("note", "").strip(),
+            "counterparty": form.get("counterparty", "").strip(),
+            "account_type": form.get("account_type", "normal").strip() or "normal",
         }
         edit_id = form.get("edit_id")
         if not payload["subject"] or float(payload["amount"]) <= 0:
@@ -309,6 +368,8 @@ def dashboard():
                 transaction.amount = float(payload["amount"])
                 transaction.type = payload["type"]
                 transaction.note = payload["note"]
+                transaction.counterparty = payload.get("counterparty", "")
+                transaction.account_type = payload.get("account_type", "normal")
                 transaction.edited_at = datetime.now().isoformat(timespec="seconds")
                 edit_message = f"Record edited at {transaction.edited_at}"
             else:
