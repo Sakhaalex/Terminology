@@ -1,0 +1,157 @@
+:root {
+  --white: #ffffff;
+  --text: #121212;
+  --border: #e5e5e5;
+  --muted: #666666;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+  color: var(--text);
+}
+
+body {
+  margin: 0;
+  background: var(--white);
+  line-height: 1.4;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--border);
+  background: var(--white);
+}
+
+.brand {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.nav a {
+  margin-left: 16px;
+  text-decoration: none;
+}
+
+main {
+  padding: 24px 32px 64px;
+}
+
+.section {
+  margin-bottom: 48px;
+}
+
+.card {
+  border: 1px solid var(--border);
+  padding: 16px;
+  margin-bottom: 24px;
+  background: var(--white);
+}
+
+.login {
+  max-width: 420px;
+  margin: 80px auto;
+  position: relative;
+}
+
+.login-mirror {
+  font-size: 48px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.15);
+  text-align: center;
+  letter-spacing: 4px;
+  margin-bottom: 16px;
+}
+
+.login-error {
+  color: #cc0000;
+  font-weight: 700;
+  font-size: 22px;
+  margin-top: 12px;
+}
+
+.login-quotes {
+  min-height: 24px;
+}
+
+.login form label,
+.editor label,
+.filters label {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+}
+
+input,
+select,
+textarea,
+button {
+  padding: 8px;
+  border: 1px solid var(--border);
+  background: var(--white);
+}
+
+button {
+  cursor: pointer;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.transactions {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 24px;
+}
+
+.transactions th,
+.transactions td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px;
+  text-align: left;
+}
+
+.transaction-row.debit td {
+  color: #b33a3a;
+}
+
+.transaction-row.credit td {
+  color: #2f7a3e;
+}
+
+.banner {
+  background: var(--white);
+  border: 1px solid var(--border);
+  padding: 8px;
+  margin: 8px 0;
+}
+
+.banner-error {
+  border-color: #cc0000;
+}
+
+.banner-row td {
+  padding: 0 8px 12px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.charts img {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--white);
+}

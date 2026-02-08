@@ -1,0 +1,29 @@
+{
+  "categories": [
+    "General",
+    "Food",
+    "Transport",
+    "Housing",
+    "Utilities",
+    "Shopping",
+    "Health",
+    "Education",
+    "Entertainment",
+    "Savings"
+  ],
+  "subcategories": [
+    "Essentials",
+    "Lifestyle",
+    "Bills",
+    "Travel",
+    "Subscriptions"
+  ],
+  "payment_modes": [
+    "Cash",
+    "UPI",
+    "Bank",
+    "Card",
+    "Loan",
+    "Other"
+  ]
+}

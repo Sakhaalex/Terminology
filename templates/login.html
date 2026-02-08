@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="login">
+  <div class="login-mirror" id="loginMirror">ALEX</div>
+  <div class="login-quotes" id="loginQuotes"></div>
+  <form method="post" class="card" id="loginForm">
+    <label>
+      Username
+      <input type="text" name="username" id="usernameInput" autocomplete="off" required />
+    </label>
+    <label>
+      Password
+      <input type="password" name="password" id="passwordInput" autocomplete="off" required />
+    </label>
+    {% if error %}
+      <div class="login-error">{{ error }}</div>
+    {% endif %}
+  </form>
+</section>
+<script>
+  const usernameInput = document.getElementById('usernameInput');
+  const passwordInput = document.getElementById('passwordInput');
+  const loginMirror = document.getElementById('loginMirror');
+  const loginForm = document.getElementById('loginForm');
+
+  function updateMirror() {
+    const value = usernameInput.value.trim();
+    loginMirror.textContent = value ? value.toUpperCase() : 'AX_PCore';
+  }
+
+  async function checkAuth() {
+    const existingError = document.querySelector('.login-error');
+    if (!usernameInput.value || !passwordInput.value) {
+      if (existingError) {
+        existingError.remove();
+      }
+      return;
+    }
+    const response = await fetch('{{ url_for("auth_check") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: usernameInput.value,
+        password: passwordInput.value
+      })
+    });
+    const data = await response.json();
+    if (data.ok) {
+      window.location.href = '{{ url_for("dashboard") }}';
+      return;
+    }
+    if (!existingError) {
+      const errorLine = document.createElement('div');
+      errorLine.className = 'login-error';
+      errorLine.textContent = 'Invalid credentials.';
+      loginForm.appendChild(errorLine);
+    }
+  }
+
+  usernameInput.addEventListener('input', () => {
+    updateMirror();
+    checkAuth();
+  });
+  passwordInput.addEventListener('input', checkAuth);
+  updateMirror();
+</script>
+{% endblock %}

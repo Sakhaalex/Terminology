@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% block content %}
+<section id="transactions" class="section">
+  <h1>Transactions View</h1>
+  {% if message %}
+    <div class="banner">{{ message }}</div>
+  {% endif %}
+  {% if edit_message %}
+    <div class="banner">{{ edit_message }}</div>
+  {% endif %}
+  <form method="post" class="editor card">
+    <input type="hidden" name="action" value="add_or_edit" />
+    <input type="hidden" name="edit_id" value="{{ edit_transaction.id if edit_transaction }}" />
+    <div class="grid">
+      <label>
+        Date
+        <input type="date" name="date" value="{{ edit_transaction.date if edit_transaction else '' }}" required />
+      </label>
+      <label>
+        Subject
+        <input type="text" name="subject" value="{{ edit_transaction.subject if edit_transaction else '' }}" required />
+      </label>
+      <label>
+        Category
+        <select name="category">
+          {% for category in categories %}
+            <option value="{{ category }}" {% if edit_transaction and edit_transaction.category == category %}selected{% endif %}>{{ category }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" name="category_new" placeholder="Add category" />
+      </label>
+      <label>
+        Subcategory
+        <select name="subcategory">
+          <option value="">None</option>
+          {% for subcategory in subcategories %}
+            <option value="{{ subcategory }}" {% if edit_transaction and edit_transaction.subcategory == subcategory %}selected{% endif %}>{{ subcategory }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" name="subcategory_new" placeholder="Add subcategory" />
+      </label>
+      <label>
+        Amount (INR)
+        <input type="number" name="amount" min="0" step="0.01" value="{{ edit_transaction.amount if edit_transaction else '' }}" required />
+      </label>
+      <label>
+        Type
+        <select name="type">
+          <option value="Debit" {% if edit_transaction and edit_transaction.type == 'Debit' %}selected{% endif %}>Debit</option>
+          <option value="Credit" {% if edit_transaction and edit_transaction.type == 'Credit' %}selected{% endif %}>Credit</option>
+        </select>
+      </label>
+      <label>
+        Mode of Payment
+        <select name="mode">
+          {% for mode in modes %}
+            <option value="{{ mode }}" {% if edit_transaction and edit_transaction.mode == mode %}selected{% endif %}>{{ mode }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" name="mode_new" placeholder="Add mode" />
+      </label>
+      <label>
+        Note
+        <input type="text" name="note" value="{{ edit_transaction.note if edit_transaction else '' }}" />
+      </label>
+    </div>
+    <button type="submit">{{ 'Update' if edit_transaction else 'Add' }} Transaction</button>
+  </form>
+
+  <form method="get" class="filters card">
+    <label>
+      Search
+      <input type="text" name="q" value="{{ query }}" placeholder="Search subject or note" />
+    </label>
+    <label>
+      Category
+      <select name="category">
+        <option value="">All</option>
+        {% for category in categories %}
+          <option value="{{ category }}" {% if category_filter == category %}selected{% endif %}>{{ category }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Type
+      <select name="type">
+        <option value="">All</option>
+        <option value="Debit" {% if type_filter == 'Debit' %}selected{% endif %}>Debit</option>
+        <option value="Credit" {% if type_filter == 'Credit' %}selected{% endif %}>Credit</option>
+      </select>
+    </label>
+    <button type="submit">Apply Filters</button>
+  </form>
+
+  <table class="transactions">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Subject</th>
+        <th>Category</th>
+        <th>Subcategory</th>
+        <th>Amount (INR)</th>
+        <th>Type</th>
+        <th>Mode</th>
+        <th>Note</th>
+        <th>Source</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for transaction in transactions %}
+        <tr class="transaction-row {{ transaction.type|lower }}">
+          <td>{{ transaction.date }}</td>
+          <td>{{ transaction.subject }}</td>
+          <td>{{ transaction.category }}</td>
+          <td>{{ transaction.subcategory }}</td>
+          <td>{{ '%.2f'|format(transaction.amount) }}</td>
+          <td>{{ transaction.type }}</td>
+          <td>{{ transaction.mode }}</td>
+          <td>{{ transaction.note }}</td>
+          <td>{{ transaction.source }}</td>
+          <td>
+            {% if can_edit(transaction) %}
+              <a href="{{ url_for('dashboard', edit_id=transaction.id) }}">Edit</a>
+            {% else %}
+              <span class="muted">Read-only</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% if transaction.edited_at %}
+          <tr class="banner-row">
+            <td colspan="10">
+              <div class="banner">Record edited at {{ transaction.edited_at }}</div>
+            </td>
+          </tr>
+        {% endif %}
+      {% else %}
+        <tr>
+          <td colspan="10" class="muted">No transactions yet.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <section class="import card">
+    <h2>Import UPI Text</h2>
+    <form method="post">
+      <input type="hidden" name="action" value="import_parse" />
+      <textarea name="upi_text" rows="6" placeholder="Paste UPI statement text here"></textarea>
+      <button type="submit">Parse Import</button>
+    </form>
+
+    {% if import_meta %}
+      <div class="summary card">
+        <div><strong>Transactions detected:</strong> {{ import_meta.detected }}</div>
+        <div><strong>New transactions:</strong> {{ import_meta.new }}</div>
+      </div>
+    {% endif %}
+
+    {% if import_preview %}
+      <h3>Import Preview</h3>
+      <table class="transactions">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Subject</th>
+            <th>Category</th>
+            <th>Subcategory</th>
+            <th>Amount</th>
+            <th>Type</th>
+            <th>Mode</th>
+            <th>Note</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in import_preview %}
+            <tr>
+              <td>{{ item.date }}</td>
+              <td>{{ item.subject }}</td>
+              <td>{{ item.category }}</td>
+              <td>{{ item.subcategory }}</td>
+              <td>{{ item.amount }}</td>
+              <td>{{ item.type }}</td>
+              <td>{{ item.mode }}</td>
+              <td>{{ item.note }}</td>
+              <td>
+                {% if item.is_duplicate %}
+                  <span class="muted">Duplicate</span>
+                {% else %}
+                  New
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <form method="post">
+        <input type="hidden" name="action" value="import_commit" />
+        <button type="submit">Save Imported Transactions</button>
+      </form>
+    {% endif %}
+  </section>
+</section>
+
+<section id="analytics" class="section">
+  <h1>Analytics / Budget Analysis</h1>
+  <div class="summary card">
+    <div>
+      <strong>Total Spend:</strong> ₹{{ '%.2f'|format(totals.spend) }} / ${{ '%.2f'|format(usd(totals.spend)) }}
+    </div>
+    <div>
+      <strong>Total Income:</strong> ₹{{ '%.2f'|format(totals.income) }} / ${{ '%.2f'|format(usd(totals.income)) }}
+    </div>
+    <div>
+      <strong>USD Rate:</strong> 1 USD = ₹{{ usd_rate }}
+    </div>
+  </div>
+  {% if images %}
+    <div class="charts">
+      <img src="data:image/png;base64,{{ images.totals }}" alt="Total spend vs income" />
+      {% if images.categories %}
+        <img src="data:image/png;base64,{{ images.categories }}" alt="Category distribution" />
+      {% endif %}
+      {% if images.top_subjects %}
+        <img src="data:image/png;base64,{{ images.top_subjects }}" alt="Top subjects by spend" />
+      {% endif %}
+      {% if images.frequency %}
+        <img src="data:image/png;base64,{{ images.frequency }}" alt="Frequency of transactions" />
+      {% endif %}
+      {% if images.trend %}
+        <img src="data:image/png;base64,{{ images.trend }}" alt="Daily spend trend" />
+      {% endif %}
+      {% if images.burn_rate %}
+        <img src="data:image/png;base64,{{ images.burn_rate }}" alt="Burn rate" />
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="muted">Add transactions to view analytics.</div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Analytical Lists</h2>
+    <div class="grid">
+      <div>
+        <h3>Transactions Above Personal Average</h3>
+        <ul>
+          {% for item in analytics.above_average %}
+            <li>{{ item.date }} — {{ item.subject }} (₹{{ '%.2f'|format(item.amount) }})</li>
+          {% else %}
+            <li class="muted">No data available.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h3>Top Spending Subjects</h3>
+        <ul>
+          {% for item in analytics.top_subjects %}
+            <li>{{ item.subject }} (₹{{ '%.2f'|format(item.amount) }})</li>
+          {% else %}
+            <li class="muted">No data available.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h3>Category Dominance</h3>
+        <ul>
+          {% for item in analytics.category_dominance %}
+            <li>{{ item.category }} — {{ '%.1f'|format(item.share) }}%</li>
+          {% else %}
+            <li class="muted">No data available.</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h3>Outlier Transactions</h3>
+        <ul>
+          {% for item in analytics.outliers %}
+            <li>{{ item.date }} — {{ item.subject }} (₹{{ '%.2f'|format(item.amount) }})</li>
+          {% else %}
+            <li class="muted">No data available.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
