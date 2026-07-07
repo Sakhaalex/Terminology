@@ -1,6 +1,6 @@
 # Links
 ## DSA
-- Visual Gohttps://visualgo.net/en
+- Visual Go https://visualgo.net/en
 
 
 ## Github learning
