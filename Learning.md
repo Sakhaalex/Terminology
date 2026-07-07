@@ -9,3 +9,6 @@
 
 ## Excel 
 -24 Billions https://24billions.com/
+
+## Machine Learning
+- https://mlvisualized.com/
